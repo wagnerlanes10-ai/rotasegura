@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fff"><title>RotaSegura</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--panel:#fff;--text:#202124;--muted:#70757a;--blue:#1a73e8;--shadow:0 3px 14px #0002}
+*{box-sizing:border-box}html,body,#map{margin:0;width:100%;height:100%;font-family:Arial,Helvetica,sans-serif}body{overflow:hidden;background:#eef2f6}#map{position:absolute;inset:0}
+.top{position:absolute;z-index:1000;top:12px;left:12px;right:12px;max-width:760px;margin:auto;background:#fff;border-radius:18px;box-shadow:0 3px 18px #0003;padding:10px}
+.brand{display:flex;align-items:center;gap:8px;padding:4px 8px 8px;font-size:20px;font-weight:700;color:var(--text)}.brand span{font-size:24px}.sub{font-size:12px;color:var(--muted);padding:0 8px 9px}
+.search{display:flex;align-items:center;gap:8px}.origin,.dest{height:50px;border:0;background:#f1f3f4;border-radius:12px;display:flex;align-items:center;padding:0 13px;flex:1;min-width:0}.dot{width:10px;height:10px;border-radius:50%;background:#1a73e8;margin-right:10px;flex:none}.pin{font-size:19px;margin-right:9px}.search input{width:100%;border:0;outline:0;background:transparent;font-size:16px;color:#202124}.go{height:50px;padding:0 19px;border:0;border-radius:12px;background:#1a73e8;color:#fff;font-weight:700;font-size:15px}.go:disabled{opacity:.6}.status{padding:8px 9px 2px;font-size:13px;color:var(--muted)}
+.routebox{display:none;margin-top:8px;border-top:1px solid #eee;padding:10px 8px 4px}.routebox.show{display:block}.route-title{font-weight:700;color:#202124;font-size:16px}.route-meta{font-size:13px;color:#5f6368;margin-top:4px}.route-actions{display:flex;gap:8px;margin-top:9px}.route-actions button{border:0;border-radius:20px;padding:8px 13px;background:#e8f0fe;color:#1967d2;font-weight:700}
+.controls{position:absolute;z-index:1000;right:14px;bottom:110px;display:flex;flex-direction:column;gap:9px}.round{width:50px;height:50px;border-radius:50%;background:#fff;box-shadow:var(--shadow);border:0;font-size:21px;color:#202124}.round:active{transform:scale(.96)}
+.bottom{position:absolute;z-index:1000;left:12px;right:12px;bottom:12px;max-width:760px;margin:auto;display:flex;justify-content:center;pointer-events:none}.pill{background:#fff;border-radius:22px;padding:9px 15px;box-shadow:var(--shadow);font-size:12px;color:#5f6368}
+.leaflet-control-attribution{font-size:9px}.leaflet-control-zoom{border:0!important;box-shadow:var(--shadow)!important}.leaflet-control-zoom a{width:42px!important;height:42px!important;line-height:42px!important;font-size:22px!important;border:0!important}.leaflet-control-scale-line{background:#ffffffdd;border:1px solid #777;color:#555}
+.user-dot{width:20px;height:20px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 1px 5px #0004}.dest-pin{font-size:31px;filter:drop-shadow(0 2px 2px #0004)}
+body.night{--panel:#202124;--text:#f8f9fa;--muted:#bdc1c6}body.night .top,body.night .round,body.night .pill{background:#202124;color:#f8f9fa}body.night .origin,body.night .dest{background:#303134}body.night .search input{color:#f8f9fa}body.night .routebox{border-color:#3c4043}body.night .route-title{color:#f8f9fa}body.night .route-meta{color:#bdc1c6}body.night .route-actions button{background:#303134;color:#8ab4f8}
+@media(max-width:480px){.top{top:8px;left:8px;right:8px;border-radius:16px}.brand{font-size:19px}.sub{display:none}.origin{display:none}.search{padding-top:4px}.dest{height:48px}.go{height:48px;padding:0 16px}.controls{right:10px;bottom:96px}.round{width:48px;height:48px}.bottom{bottom:8px}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<section class="top">
+<div class="brand"><span>🛡️</span>RotaSegura</div>
+<div class="sub">Mapa real · busca de destino · rota com alternativas</div>
+<div class="search"><div class="origin"><span class="dot"></span><span>Sua localização</span></div><div class="dest"><span class="pin">⌖</span><input id="destino" autocomplete="off" placeholder="Para onde? Ex.: Maricá, RJ"></div><button class="go" id="buscar">Ir</button></div>
+<div class="status" id="status">Obtendo sua localização…</div>
+<div class="routebox" id="routebox"><div class="route-title">Rota principal</div><div class="route-meta" id="routeMeta"></div><div class="route-actions"><button id="recenter">Recentrar rota</button></div></div>
+</section>
+<div class="controls"><button class="round" id="locate" title="Minha localização">⌾</button><button class="round" id="theme" title="Modo claro/escuro">☾</button></div>
+<div class="bottom"><div class="pill">🗺️ Mapa real · OpenStreetMap</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([-22.9068,-43.1729],12);
+L.control.zoom({position:'bottomright'}).addTo(map);L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
+const light=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
+const dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap © CARTO'});
+let darkOn=false,userPos=null,userMarker=null,destMarker=null,routeLayers=[],lastBounds=null;
+const $=id=>document.getElementById(id);function setStatus(t){$('status').textContent=t}
+function setTheme(night){darkOn=night;document.body.classList.toggle('night',night);if(night){if(map.hasLayer(light))map.removeLayer(light);dark.addTo(map);$('theme').textContent='☀️'}else{if(map.hasLayer(dark))map.removeLayer(dark);light.addTo(map);$('theme').textContent='☾'}}light.addTo(map);
+function autoTheme(){const h=new Date().getHours();setTheme(h>=18||h<6)}autoTheme();setInterval(autoTheme,60000);$('theme').onclick=()=>setTheme(!darkOn);
+function drawUser(pos){userPos=[pos.coords.latitude,pos.coords.longitude];const icon=L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[20,20],iconAnchor:[10,10]});if(userMarker)userMarker.setLatLng(userPos);else userMarker=L.marker(userPos,{icon,zIndexOffset:1000}).addTo(map).bindTooltip('Você está aqui');map.setView(userPos,15)}
+function locate(){if(!navigator.geolocation){setStatus('Seu navegador não disponibiliza localização.');return}setStatus('Solicitando sua localização…');navigator.geolocation.getCurrentPosition(p=>{drawUser(p);setStatus('📍 Localização ativa. Escolha um destino.')},()=>setStatus('⚠️ Permita o acesso à localização para calcular a rota.'),{enableHighAccuracy:true,timeout:12000,maximumAge:5000})}$('locate').onclick=locate;locate();
+function clearRoutes(){routeLayers.forEach(x=>map.removeLayer(x));routeLayers=[];lastBounds=null}
+async function geocode(q){const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q='+encodeURIComponent(q),{headers:{'Accept-Language':'pt-BR'}});if(!r.ok)throw new Error('geocode');const a=await r.json();if(!a.length)throw new Error('notfound');return{lat:+a[0].lat,lon:+a[0].lon,name:a[0].display_name}}
+async function route(from,to){const r=await fetch(`https://router.project-osrm.org/route/v1/driving/${from[1]},${from[0]};${to.lon},${to.lat}?overview=full&geometries=geojson&alternatives=true&steps=false`);if(!r.ok)throw new Error('route');return r.json()}
+function drawRoutes(data){clearRoutes();const routes=data.routes||[];routes.slice(0,3).forEach((r,i)=>{const pts=r.geometry.coordinates.map(c=>[c[1],c[0]]);const line=L.polyline(pts,{color:i===0?'#1a73e8':i===1?'#f9ab00':'#9aa0a6',weight:i===0?8:5,opacity:i===0?.95:.72,dashArray:i===0?null:'9 10',lineCap:'round',lineJoin:'round'}).addTo(map);routeLayers.push(line)});if(routes[0]){$('routeMeta').textContent=`⏱️ ${Math.max(1,Math.round(routes[0].duration/60))} min  ·  📏 ${(routes[0].distance/1000).toFixed(1)} km  ·  ${routes.length>1?'há alternativas':'rota principal'}`;$('routebox').classList.add('show')}const all=[];routes.slice(0,3).forEach(r=>r.geometry.coordinates.forEach(c=>all.push([c[1],c[0]])));if(all.length){lastBounds=L.latLngBounds(all);map.fitBounds(lastBounds,{paddingTopLeft:[18,190],paddingBottomRight:[70,145],maxZoom:16})}}
+async function buscar(){const q=$('destino').value.trim();if(!q){setStatus('Digite um destino.');$('destino').focus();return}if(!userPos){setStatus('Aguardando sua localização…');locate();return}const btn=$('buscar');btn.disabled=true;btn.textContent='…';try{setStatus('🔎 Localizando destino…');const dest=await geocode(q);if(destMarker)map.removeLayer(destMarker);const icon=L.divIcon({className:'',html:'<div class="dest-pin">📍</div>',iconSize:[34,34],iconAnchor:[17,32]});destMarker=L.marker([dest.lat,dest.lon],{icon}).addTo(map).bindTooltip(dest.name);setStatus('🛣️ Calculando a melhor rota…');const data=await route(userPos,dest);if(data.code!=='Ok'||!data.routes.length)throw new Error('noroute');drawRoutes(data);setStatus('✅ Rota calculada. A azul é a principal; alternativas aparecem tracejadas.')}catch(e){setStatus(e.message==='notfound'?'❌ Não encontrei esse destino. Tente cidade e estado.':'❌ Não foi possível calcular a rota agora. Tente novamente.')}finally{btn.disabled=false;btn.textContent='Ir'}}
+$('buscar').onclick=buscar;$('destino').addEventListener('keydown',e=>{if(e.key==='Enter')buscar()});$('recenter').onclick=()=>{if(lastBounds)map.fitBounds(lastBounds,{paddingTopLeft:[18,190],paddingBottomRight:[70,145],maxZoom:16});else if(userPos)map.setView(userPos,15)};
+</script>
+</body></html>
