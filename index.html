@@ -63,24 +63,67 @@ body.night .route-meta{color:#bdc1c6}body.night .route-actions button{background
 <button class="round" id="locate" title="Minha localização">⌾</button>
 <button class="round" id="theme" title="Modo claro/escuro">☾</button>
 </div>
-<div class="bottom"><div class="pill">🗺️ Mapa real · OpenStreetMap</div></div>
+<div class="bottom"><div class="pill">🗺️ Mapa real · OpenStreetMap · OSRM</div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([-22.9068,-43.1729],12);
 L.control.zoom({position:'bottomright'}).addTo(map);
 L.control.scale({imperial:false,position:'bottomleft'}).addTo(map);
 
-const light=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap contributors © CARTO'});
-const dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:20,attribution:'© OpenStreetMap © CARTO'});
-let darkOn=false,userPos=null,userMarker=null,destMarker=null,routeLayers=[],lastBounds=null;
+// OpenStreetMap é o provedor principal.
+// CARTO fica como fallback caso os tiles do OSM falhem.
+const osmLight=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19,
+  attribution:'© OpenStreetMap contributors'
+});
+const cartoLight=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  maxZoom:20,
+  attribution:'© OpenStreetMap contributors © CARTO'
+});
+const osmDark=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  maxZoom:19,
+  attribution:'© OpenStreetMap contributors'
+});
+const cartoDark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  maxZoom:20,
+  attribution:'© OpenStreetMap contributors © CARTO'
+});
+let light=osmLight,dark=cartoDark,darkOn=false,userPos=null,userMarker=null,destMarker=null,routeLayers=[],lastBounds=null;
+let usingFallback=false;
+
+function activateFallback(){
+  if(!map.hasLayer(light))return;
+  map.removeLayer(light);
+  cartoLight.addTo(map);
+  light=cartoLight;
+  usingFallback=true;
+  setStatus('🗺️ Mapa alternativo ativado.');
+}
+osmLight.on('tileerror',activateFallback);
 const $=id=>document.getElementById(id);function setStatus(t){$('status').textContent=t}
 
 function setTheme(night){
-darkOn=night;document.body.classList.toggle('night',night);
-if(night){if(map.hasLayer(light))map.removeLayer(light);dark.addTo(map);$('theme').textContent='☀️'}
-else{if(map.hasLayer(dark))map.removeLayer(dark);light.addTo(map);$('theme').textContent='☾'}
-}
+  darkOn=night;
+  document.body.classList.toggle('night',night);
+
+  if(night){
+    if(map.hasLayer(light))map.removeLayer(light);
+    dark.addTo(map);
+    $('theme').textContent='☀️';
+  }else{
+    if(map.hasLayer(dark))map.removeLayer(dark);
+    light.addTo(map);
+    $('theme').textContent='☾';
+  }
+} 
 light.addTo(map);
+osmDark.on('tileerror',()=>{
+  if(map.hasLayer(osmDark)){
+    map.removeLayer(osmDark);
+    cartoDark.addTo(map);
+    dark=cartoDark;
+  }
+});
 function autoTheme(){const h=new Date().getHours();setTheme(h>=18||h<6)}
 autoTheme();setInterval(autoTheme,60000);$('theme').onclick=()=>setTheme(!darkOn);
 
